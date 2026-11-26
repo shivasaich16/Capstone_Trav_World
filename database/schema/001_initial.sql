@@ -1,0 +1,23 @@
+-- SQLite schema used by the local backend.
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  password_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS experiences (
+  id TEXT PRIMARY KEY, title TEXT NOT NULL, location TEXT NOT NULL,
+  category TEXT NOT NULL, price REAL NOT NULL CHECK(price >= 0),
+  unit TEXT NOT NULL DEFAULT 'person', image TEXT, description TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS bookings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  experience_id TEXT NOT NULL REFERENCES experiences(id),
+  customer_name TEXT NOT NULL, customer_email TEXT NOT NULL,
+  booking_date TEXT NOT NULL,
+  guests INTEGER NOT NULL CHECK(guests BETWEEN 1 AND 30),
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
