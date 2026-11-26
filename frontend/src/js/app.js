@@ -1,974 +1,450 @@
+(() => {
+  'use strict';
 
-const API_BASE = 'http://localhost:4000/api';
+  const API_BASE = window.SERVICE_BOOKER_API || 'http://localhost:4000/api';
+  const $ = id => document.getElementById(id);
+  const tokenKey = 'travworld_token';
+  const emailKey = 'travworld_email';
 
-const $ = (id) => document.getElementById(id);
+  let experiences = [];
+  let activeFilter = 'All';
+  let selectedExperience = null;
+  let pendingExperience = null;
+  let authMode = 'login';
+  let currentBooking = null;
+  let checkoutTimer = null;
+  let checkoutDeadline = 0;
+  let checkoutExpired = false;
+  let toastTimer = null;
 
-let experiences = [];
-let currentFilter = 'All';
-let currentBooking = null;
-let authMode = 'login';
+  const fallbackImages = [
+    'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1100&q=85',
+    'https://images.unsplash.com/photo-1449158743715-0a90ebb6d2d8?auto=format&fit=crop&w=1100&q=85',
+    'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1100&q=85',
+    'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1100&q=85',
+    'https://images.unsplash.com/photo-1599661046827-dacff0c0f09a?auto=format&fit=crop&w=1100&q=85',
+    'https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=1100&q=85'
+  ];
 
-let checkoutInterval = null;
-let checkoutExpiresAt = null;
-let checkoutExpired = false;
+  const sampleExperiences = [
+    {id:'sample-01',title:'Himalayan Mountain Escape',location:'Manali, Himachal Pradesh',category:'Adventure',price:2499,unit:'person',image:fallbackImages[0],description:'A refreshing mountain escape with guided local experiences.'},
+    {id:'sample-02',title:'A Slow Stay in the Hills',location:'Coorg, Karnataka',category:'Stay',price:3899,unit:'night',image:fallbackImages[1],description:'Unwind in a peaceful hideaway surrounded by greenery.'},
+    {id:'sample-03',title:'Coastal Flavours Trail',location:'Goa, India',category:'Food',price:1499,unit:'person',image:fallbackImages[2],description:'Taste regional favourites with a local food host.'},
+    {id:'sample-04',title:'Sunrise Valley Trek',location:'Araku Valley, Andhra Pradesh',category:'Adventure',price:1799,unit:'person',image:fallbackImages[3],description:'A guided early morning walk through scenic trails.'},
+    {id:'sample-05',title:'Heritage City Walk',location:'Jaipur, Rajasthan',category:'Local tours',price:999,unit:'person',image:fallbackImages[4],description:'Explore old streets, architecture and stories with a local.'},
+    {id:'sample-06',title:'Backwater Day Experience',location:'Alappuzha, Kerala',category:'Local tours',price:2199,unit:'person',image:fallbackImages[5],description:'Enjoy a relaxed day discovering Kerala’s waterways.'}
+  ];
 
-let selectedExperience = null;
+  const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[ch]);
 
-const CHECKOUT_DURATION = 60;
-const TIMER_RADIUS = 95;
-const TIMER_CIRCUMFERENCE = 2 * Math.PI * TIMER_RADIUS;
-
-// --------------------------------------------------
-// GENERAL HELPERS
-// --------------------------------------------------
-
-function getToken() {
-  return localStorage.getItem('travworld_token');
-}
-
-function authHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${getToken()}`
-  };
-}
-
-async function apiRequest(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, options);
-
-  let data = {};
-
-  try {
-    data = await response.json();
-  } catch {
-    data = {};
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      data.error || data.message || 'Something went wrong.'
-    );
-  }
-
-  return data;
-}
-
-function escapeHTML(value) {
-  return String(value ?? '').replace(/[&<>"']/g, character => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
-  })[character]);
-}
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0
+  const money = amount => new Intl.NumberFormat('en-IN', {
+    style:'currency', currency:'INR', maximumFractionDigits:0
   }).format(Number(amount) || 0);
-}
 
-function formatDate(date) {
-  if (!date) return 'Date not available';
-
-  const parsed = new Date(`${date}T00:00:00`);
-
-  if (Number.isNaN(parsed.getTime())) return date;
-
-  return parsed.toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric'
-  });
-}
-
-function setMessage(id, message, isError = false) {
-  const element = $(id);
-  if (!element) return;
-
-  element.textContent = message;
-  element.style.color = isError ? '#b42318' : '';
-}
-
-function openDialog(id) {
-  const dialog = $(id);
-  if (dialog && !dialog.open) dialog.showModal();
-}
-
-function closeDialog(id) {
-  const dialog = $(id);
-  if (dialog?.open) dialog.close();
-}
-
-// --------------------------------------------------
-// EXPERIENCES
-// --------------------------------------------------
-
-const fallbackExperiences = [
-  {
-    id: 'exp-001',
-    title: 'Mountain Adventure',
-    destination: 'Himachal Pradesh',
-    category: 'Adventure',
-    price: 2499,
-    description: 'Discover mountain trails and unforgettable views.'
-  },
-  {
-    id: 'exp-002',
-    title: 'Luxury Nature Stay',
-    destination: 'Kerala',
-    category: 'Stay',
-    price: 3999,
-    description: 'Relax in a peaceful natural setting.'
-  },
-  {
-    id: 'exp-003',
-    title: 'Local Food Experience',
-    destination: 'Hyderabad',
-    category: 'Food',
-    price: 999,
-    description: 'Explore local flavours and traditional food.'
-  },
-  {
-    id: 'exp-004',
-    title: 'Coastal Escape',
-    destination: 'Goa',
-    category: 'Adventure',
-    price: 2999,
-    description: 'Enjoy the coast and beautiful beaches.'
-  },
-  {
-    id: 'exp-005',
-    title: 'Heritage City Tour',
-    destination: 'Jaipur',
-    category: 'Local tours',
-    price: 1499,
-    description: 'Explore historic streets and local culture.'
-  },
-  {
-    id: 'exp-006',
-    title: 'Scenic Transport',
-    destination: 'Uttarakhand',
-    category: 'Transport',
-    price: 1299,
-    description: 'Travel through beautiful mountain routes.'
-  }
-];
-
-async function loadExperiences() {
-  try {
-    const data = await apiRequest('/experiences');
-
-    experiences = Array.isArray(data)
-      ? data
-      : data.experiences || data.items || fallbackExperiences;
-
-  } catch (error) {
-    console.warn('Using sample experiences:', error.message);
-    experiences = fallbackExperiences;
-  }
-
-  renderExperiences();
-}
-
-function renderExperiences() {
-  const grid = $('experienceGrid');
-  if (!grid) return;
-
-  const destinationQuery = (
-    $('destinationInput')?.value || ''
-  ).trim().toLowerCase();
-
-  const filtered = experiences.filter(experience => {
-    const category = experience.category || '';
-
-    const matchesCategory =
-      currentFilter === 'All' ||
-      category.toLowerCase() === currentFilter.toLowerCase();
-
-    const searchableText = [
-      experience.title,
-      experience.destination,
-      experience.location,
-      experience.category,
-      experience.description
-    ].join(' ').toLowerCase();
-
-    return matchesCategory &&
-      searchableText.includes(destinationQuery);
+  const token = () => localStorage.getItem(tokenKey);
+  const authHeaders = () => ({
+    'Content-Type':'application/json',
+    Authorization:`Bearer ${token()}`
   });
 
-  if (!filtered.length) {
-    grid.innerHTML =
-      '<p>No experiences found. Try another search.</p>';
-    return;
+  async function api(path, options = {}) {
+    const response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: { ...(options.headers || {}) }
+    });
+    let data = {};
+    try { data = await response.json(); } catch (_) {}
+    if (!response.ok) throw new Error(data.error || data.message || `Request failed (${response.status})`);
+    return data;
   }
 
-  grid.innerHTML = filtered.map(experience => {
-    const id = escapeHTML(experience.id);
-    const title = escapeHTML(
-      experience.title || 'Travel experience'
-    );
+  function showDialog(id) {
+    const dialog = $(id);
+    if (dialog && !dialog.open) dialog.showModal();
+  }
 
-    const destination = escapeHTML(
-      experience.destination ||
-      experience.location ||
-      'India'
-    );
+  function closeDialog(id) {
+    const dialog = $(id);
+    if (dialog?.open) dialog.close();
+  }
 
-    const category = escapeHTML(
-      experience.category || 'Experience'
-    );
+  function message(id, text, error = false) {
+    const node = $(id);
+    if (!node) return;
+    node.textContent = text || '';
+    node.style.color = error ? '#a34135' : '';
+  }
 
-    const description = escapeHTML(
-      experience.description ||
-      'Discover this experience with Trav-World.'
-    );
+  function toast(text) {
+    const node = $('toast');
+    if (!node) return;
+    node.textContent = text;
+    node.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => node.classList.remove('show'), 2800);
+  }
 
-    const price = formatCurrency(
-      experience.price ??
-      experience.unitPrice ??
-      experience.pricePerPerson
-    );
+  function imageFor(item, index) {
+    return item.image || fallbackImages[index % fallbackImages.length];
+  }
 
-    return `
-      <article class="experience-card">
-        <div class="experience-card-content">
-          <p class="eyebrow dark">${category}</p>
-          <h3>${title}</h3>
-          <p>${destination}</p>
-          <p>${description}</p>
-          <strong>${price} <span>/ person</span></strong>
+  function renderExperiences() {
+    const grid = $('experienceGrid');
+    if (!grid) return;
 
-          <button
-            type="button"
-            class="btn btn-primary book-experience-btn"
-            data-experience-id="${id}">
-            Book experience
-          </button>
-        </div>
-      </article>
-    `;
-  }).join('');
-}
-
-$('filterRow')?.addEventListener('click', event => {
-  const button = event.target.closest('[data-filter]');
-  if (!button) return;
-
-  currentFilter = button.dataset.filter;
-
-  document.querySelectorAll('.filter-chip').forEach(chip => {
-    chip.classList.toggle('active', chip === button);
-  });
-
-  renderExperiences();
-});
-
-$('searchForm')?.addEventListener('submit', event => {
-  event.preventDefault();
-  renderExperiences();
-});
-
-$('destinationInput')?.addEventListener(
-  'input',
-  renderExperiences
-);
-
-// --------------------------------------------------
-// AUTHENTICATION
-// --------------------------------------------------
-
-function showAuth(mode = 'login') {
-  authMode = mode;
-
-  $('dialogTitle').textContent =
-    mode === 'register' ? 'Create an account' : 'Log in';
-
-  $('authSubmit').textContent =
-    mode === 'register' ? 'Create account' : 'Continue';
-
-  $('authSwitch').innerHTML = mode === 'register'
-    ? 'Already registered? <button type="button">Log in</button>'
-    : 'New here? <button type="button">Create an account</button>';
-
-  setMessage('authMessage', '');
-  openDialog('authDialog');
-}
-
-$('loginBtn')?.addEventListener('click', () => showAuth('login'));
-
-$('authSwitch')?.addEventListener('click', () => {
-  showAuth(authMode === 'login' ? 'register' : 'login');
-});
-
-$('authForm')?.addEventListener('submit', async event => {
-  event.preventDefault();
-
-  const email = $('email').value.trim().toLowerCase();
-  const password = $('password').value;
-
-  const endpoint = authMode === 'register'
-    ? '/auth/register'
-    : '/auth/login';
-
-  try {
-    $('authSubmit').disabled = true;
-    setMessage('authMessage', 'Please wait...');
-
-    const data = await apiRequest(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+    const query = ($('destinationInput')?.value || '').trim().toLowerCase();
+    const category = $('categoryInput')?.value || '';
+    const filtered = experiences.filter(item => {
+      const itemCategory = String(item.category || '');
+      const categoryMatch = activeFilter === 'All' ||
+        itemCategory.toLowerCase() === activeFilter.toLowerCase();
+      const selectMatch = !category || itemCategory.toLowerCase() === category.toLowerCase();
+      const searchable = [item.title, item.location, item.destination, item.category, item.description]
+        .join(' ').toLowerCase();
+      return categoryMatch && selectMatch && searchable.includes(query);
     });
 
-    if (!data.token) {
-      throw new Error('The server did not return a login token.');
-    }
-
-    localStorage.setItem('travworld_token', data.token);
-
-    localStorage.setItem(
-      'travworld_email',
-      data.user?.email || email
-    );
-
-    closeDialog('authDialog');
-    $('loginBtn').textContent = 'My Account';
-
-    if (window.openBookingsAfterLogin) {
-      window.openBookingsAfterLogin = false;
-      openMyBookings();
-    }
-
-  } catch (error) {
-    setMessage('authMessage', error.message, true);
-
-  } finally {
-    $('authSubmit').disabled = false;
-  }
-});
-
-// --------------------------------------------------
-// OPEN BOOKING FORM
-// --------------------------------------------------
-
-$('experienceGrid')?.addEventListener('click', event => {
-  const button = event.target.closest('.book-experience-btn');
-  if (!button) return;
-
-  const experience = experiences.find(
-    item => String(item.id) === button.dataset.experienceId
-  );
-
-  if (!experience) return;
-
-  selectedExperience = experience;
-
-  $('bookingExperienceId').value = experience.id;
-  $('bookingTitle').textContent = `Book ${experience.title}`;
-
-  $('customerEmail').value =
-    localStorage.getItem('travworld_email') || '';
-
-  const today = new Date();
-
-  const localToday = new Date(
-    today.getTime() - today.getTimezoneOffset() * 60000
-  ).toISOString().split('T')[0];
-
-  $('bookingDate').min = localToday;
-  $('bookingDate').value = '';
-
-  if ($('guestCount')) {
-    $('guestCount').value = 1;
-  }
-
-  setMessage('bookingMessage', '');
-
-  updateTotal();
-  resetPaymentOptions();
-
-  openDialog('bookingDialog');
-});
-
-// --------------------------------------------------
-// PAYMENT METHOD AND TOTAL
-// --------------------------------------------------
-
-const paymentRadios = document.querySelectorAll(
-  'input[name="paymentMethod"]'
-);
-
-const cardDetails = $('cardDetails');
-const upiDetails = $('upiDetails');
-
-function updateTotal() {
-  const guests = Math.max(
-    1,
-    Number($('guestCount')?.value || 1)
-  );
-
-  selectedExperience = experiences.find(
-    item => String(item.id) === String($('bookingExperienceId')?.value)
-  );
-
-  const unitPrice = Number(
-    selectedExperience?.price ??
-    selectedExperience?.unitPrice ??
-    selectedExperience?.pricePerPerson ??
-    0
-  );
-
-  const total = unitPrice * guests;
-
-  if ($('bookingTotal')) {
-    $('bookingTotal').textContent = formatCurrency(total);
-  }
-
-  if ($('checkoutAmount')) {
-    $('checkoutAmount').textContent = formatCurrency(total);
-  }
-
-  return total;
-}
-
-function resetPaymentOptions() {
-  paymentRadios.forEach(radio => {
-    radio.checked = false;
-  });
-
-  if (cardDetails) cardDetails.hidden = true;
-  if (upiDetails) upiDetails.hidden = true;
-
-  ['cardName', 'cardNumber', 'cardExpiry', 'upiId'].forEach(id => {
-    if ($(id)) $(id).required = false;
-  });
-}
-
-paymentRadios.forEach(radio => {
-  radio.addEventListener('change', () => {
-    const method = document.querySelector(
-      'input[name="paymentMethod"]:checked'
-    )?.value?.toLowerCase();
-
-    if (cardDetails) cardDetails.hidden = method !== 'card';
-    if (upiDetails) upiDetails.hidden = method !== 'upi';
-
-    if ($('cardName')) $('cardName').required = method === 'card';
-    if ($('cardNumber')) $('cardNumber').required = method === 'card';
-    if ($('cardExpiry')) $('cardExpiry').required = method === 'card';
-    if ($('upiId')) $('upiId').required = method === 'upi';
-  });
-});
-
-$('guestCount')?.addEventListener('input', updateTotal);
-
-// --------------------------------------------------
-// BOOKING SUBMISSION
-// --------------------------------------------------
-
-$('bookingForm')?.addEventListener('submit', async event => {
-  event.preventDefault();
-
-  if (!getToken()) {
-    closeDialog('bookingDialog');
-    window.openBookingsAfterLogin = false;
-    showAuth('login');
-    setMessage('authMessage', 'Please log in before booking.');
-    return;
-  }
-
-  const method = document.querySelector(
-    'input[name="paymentMethod"]:checked'
-  )?.value;
-
-  if (!method) {
-    setMessage('bookingMessage', 'Please select a payment method.', true);
-    return;
-  }
-
-  if (method.toLowerCase() === 'upi') {
-    const upi = $('upiId')?.value.trim() || '';
-
-    if (!/^[\w.-]+@[\w.-]+$/.test(upi)) {
-      setMessage('bookingMessage', 'Please enter a valid UPI ID.', true);
+    if (!filtered.length) {
+      grid.innerHTML = '<div class="loading-card"><p>No experiences found. Try another destination or category.</p></div>';
       return;
     }
+
+    grid.innerHTML = filtered.map(item => {
+      const originalIndex = experiences.indexOf(item);
+      const title = escapeHTML(item.title || 'A memorable experience');
+      const location = escapeHTML(item.location || item.destination || 'India');
+      const categoryLabel = escapeHTML(item.category || 'Experience');
+      const description = escapeHTML(item.description || 'Discover something memorable with Trav-World.');
+      const price = money(item.price ?? item.unitPrice ?? item.pricePerPerson);
+      const image = escapeHTML(imageFor(item, originalIndex));
+      const id = escapeHTML(item.id);
+      const unit = escapeHTML(item.unit || 'person');
+      return `
+        <article class="experience-card">
+          <div class="experience-image-wrap">
+            <img class="experience-image" src="${image}" alt="${title} in ${location}" loading="lazy"
+              onerror="this.onerror=null;this.src='${fallbackImages[originalIndex % fallbackImages.length]}'">
+            <span class="experience-tag">${categoryLabel}</span>
+            <span class="experience-save" aria-hidden="true">✳</span>
+          </div>
+          <div class="experience-card-content">
+            <p class="card-location">✳ &nbsp;${location}</p>
+            <h3>${title}</h3>
+            <p class="card-description">${description}</p>
+            <div class="card-bottom">
+              <div class="card-price">${price} <small>/ ${unit}</small></div>
+              <button class="card-book" type="button" data-book="${id}">Explore & book ↗</button>
+            </div>
+          </div>
+        </article>`;
+    }).join('');
   }
 
-  const total = updateTotal();
-
-  if (!selectedExperience || total <= 0) {
-    setMessage('bookingMessage', 'Please select a valid experience.', true);
-    return;
-  }
-
-  const payload = {
-    experienceId: $('bookingExperienceId').value,
-    customerName: $('customerName').value.trim(),
-    customerEmail: $('customerEmail').value.trim(),
-    customerPhone: $('customerPhone')?.value.trim() || '',
-    date: $('bookingDate').value,
-    time: $('bookingTime')?.value || '',
-    guests: Number($('guestCount').value),
-    transportMode: $('transportMode')?.value || '',
-    pickupLocation: $('pickupLocation')?.value.trim() || '',
-    paymentMethod: method.toUpperCase()
-  };
-
-  const submitButton = $('bookingForm').querySelector(
-    'button[type="submit"]'
-  );
-
-  try {
-    if (submitButton) submitButton.disabled = true;
-
-    setMessage('bookingMessage', 'Creating your booking...');
-
-    const data = await apiRequest('/bookings', {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(payload)
-    });
-
-    currentBooking = data.booking || data;
-
-    if (!currentBooking?.id) {
-      throw new Error('The server did not return a booking ID.');
+  async function loadExperiences() {
+    const note = $('apiNote');
+    try {
+      const result = await api('/experiences');
+      experiences = Array.isArray(result) ? result : (result.experiences || result.items || []);
+      if (!experiences.length) experiences = sampleExperiences;
+      if (note) note.textContent = '';
+    } catch (error) {
+      experiences = sampleExperiences;
+      if (note) note.textContent = 'Showing preview experiences because the local API is not connected. Start the backend to load your saved listings and enable bookings.';
     }
-
-    closeDialog('bookingDialog');
-    startCheckout();
-
-  } catch (error) {
-    setMessage('bookingMessage', error.message, true);
-
-  } finally {
-    if (submitButton) submitButton.disabled = false;
-  }
-});
-
-// --------------------------------------------------
-// CHECKOUT DIALOG AND STOPWATCH
-// --------------------------------------------------
-
-function setCheckoutStatus(heading, status) {
-  if ($('checkoutHeading')) {
-    $('checkoutHeading').textContent = heading;
+    renderExperiences();
   }
 
-  if ($('checkoutStatus')) {
-    $('checkoutStatus').textContent = status;
-  }
-}
-
-function updateStopwatch(seconds) {
-  const timerText = $('timerText');
-  const timerProgress = $('timerProgress');
-
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-
-  if (timerText) {
-    timerText.textContent =
-      `${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+  function setAuthMode(mode) {
+    authMode = mode;
+    $('dialogTitle').textContent = mode === 'register' ? 'Start your story here.' : 'Good to have you back.';
+    $('authSubmit').innerHTML = mode === 'register' ? 'Create account <span>→</span>' : 'Sign in <span>→</span>';
+    $('authSwitch').innerHTML = mode === 'register'
+      ? 'Already have an account? <button type="button">Sign in</button>'
+      : 'New to Trav-World? <button type="button">Create an account</button>';
+    message('authMessage', '');
+    showDialog('authDialog');
   }
 
-  if (timerProgress) {
-    const progress =
-      TIMER_CIRCUMFERENCE *
-      (1 - seconds / CHECKOUT_DURATION);
-
-    timerProgress.style.strokeDasharray =
-      TIMER_CIRCUMFERENCE;
-
-    timerProgress.style.strokeDashoffset =
-      progress;
+  function openBooking(item) {
+    selectedExperience = item;
+    $('bookingExperienceId').value = item.id;
+    $('bookingTitle').textContent = `A little getaway: ${item.title}`;
+    $('customerEmail').value = localStorage.getItem(emailKey) || '';
+    $('customerName').value = '';
+    $('customerPhone').value = '';
+    $('bookingDate').value = '';
+    $('bookingTime').value = '';
+    $('guestCount').value = '1';
+    $('transportMode').value = '';
+    $('pickupLocation').value = '';
+    $('paymentMethod').value = '';
+    const now = new Date();
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0,10);
+    $('bookingDate').min = localDate;
+    updateTotal();
+    message('bookingMessage', '');
+    showDialog('bookingDialog');
   }
 
-  if (timerProgress) {
-    timerProgress.classList.toggle(
-      'timer-warning',
-      seconds <= 15
-    );
-  }
-}
-
-function startCheckout() {
-  clearInterval(checkoutInterval);
-  checkoutExpired = false;
-
-  checkoutExpiresAt = Date.now() + CHECKOUT_DURATION * 1000;
-
-  updateStopwatch(CHECKOUT_DURATION);
-
-  setCheckoutStatus(
-    'Securing your booking',
-    'Securing your reservation...'
-  );
-
-  if ($('checkoutAmount')) {
-    $('checkoutAmount').textContent =
-      $('bookingTotal')?.textContent || formatCurrency(0);
+  function updateTotal() {
+    if (!selectedExperience) return 0;
+    const guests = Math.max(1, Number($('guestCount')?.value || 1));
+    const unit = Number(selectedExperience.price ?? selectedExperience.unitPrice ?? selectedExperience.pricePerPerson ?? 0);
+    const total = unit * guests;
+    $('bookingTotal').textContent = money(total);
+    return total;
   }
 
-  if ($('cancelCheckout')) {
-    $('cancelCheckout').textContent = 'Cancel checkout';
-    $('cancelCheckout').disabled = false;
+  function showBookingsAfterAuth() {
+    if (pendingExperience) {
+      const item = pendingExperience;
+      pendingExperience = null;
+      openBooking(item);
+    } else if (window.showBookingsAfterAuth) {
+      window.showBookingsAfterAuth = false;
+      openMyBookings();
+    }
   }
 
-  if ($('confirmCheckout')) {
+  async function submitAuth(event) {
+    event.preventDefault();
+    const email = $('email').value.trim().toLowerCase();
+    const password = $('password').value;
+    const endpoint = authMode === 'register' ? '/auth/register' : '/auth/login';
+    $('authSubmit').disabled = true;
+    message('authMessage', 'Just a moment...');
+    try {
+      const result = await api(endpoint, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email,password})
+      });
+      if (!result.token) throw new Error('The server did not return a sign-in token.');
+      localStorage.setItem(tokenKey, result.token);
+      localStorage.setItem(emailKey, result.user?.email || email);
+      $('loginBtn').textContent = 'My account ↗';
+      closeDialog('authDialog');
+      toast(authMode === 'register' ? 'Your account is ready. Welcome!' : 'Welcome back!');
+      showBookingsAfterAuth();
+    } catch (error) {
+      message('authMessage', error.message, true);
+    } finally {
+      $('authSubmit').disabled = false;
+    }
+  }
+
+  function startCheckout(booking) {
+    currentBooking = booking;
+    checkoutExpired = false;
+    clearInterval(checkoutTimer);
+    checkoutDeadline = Date.now() + 60000;
+    $('checkoutHeading').textContent = 'Your journey is almost set.';
+    $('checkoutStatus').textContent = 'Confirm your simulated payment before the timer ends.';
+    $('checkoutReference').textContent = booking.bookingReference || booking.id || '—';
+    $('checkoutExperience').textContent = booking.experienceTitle || selectedExperience?.title || 'Your experience';
+    $('checkoutMethod').textContent = booking.paymentMethod || '—';
+    $('checkoutAmount').textContent = money(booking.pricing?.total || booking.total || updateTotal());
+    $('timerText').textContent = '01:00';
     $('confirmCheckout').disabled = false;
+    $('confirmCheckout').textContent = 'Confirm demo payment →';
+    message('checkoutMessage', '');
+    closeDialog('bookingDialog');
+    showDialog('checkoutDialog');
+    checkoutTimer = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((checkoutDeadline - Date.now()) / 1000));
+      $('timerText').textContent = `${String(Math.floor(remaining / 60)).padStart(2,'0')}:${String(remaining % 60).padStart(2,'0')}`;
+      if (remaining <= 0) {
+        checkoutExpired = true;
+        clearInterval(checkoutTimer);
+        $('checkoutHeading').textContent = 'Time for this checkout has passed.';
+        $('checkoutStatus').textContent = 'The booking payment window has expired. You can close this and make a new booking.';
+        $('confirmCheckout').disabled = true;
+        message('checkoutMessage', 'Payment window expired.', true);
+      }
+    }, 250);
   }
 
-  openDialog('checkoutDialog');
-
-  checkoutInterval = setInterval(() => {
-    const remaining = Math.max(
-      0,
-      Math.ceil((checkoutExpiresAt - Date.now()) / 1000)
-    );
-
-    updateStopwatch(remaining);
-
-    if (remaining > 45) {
-      setCheckoutStatus(
-        'Securing your booking',
-        'Securing your reservation...'
-      );
-    } else if (remaining > 30) {
-      setCheckoutStatus(
-        'Verifying details',
-        'Verifying your booking details...'
-      );
-    } else if (remaining > 15) {
-      setCheckoutStatus(
-        'Preparing confirmation',
-        'Preparing your confirmation...'
-      );
-    } else if (remaining > 0) {
-      setCheckoutStatus(
-        'Almost there',
-        'Almost there...'
-      );
+  async function submitBooking(event) {
+    event.preventDefault();
+    if (!token()) {
+      closeDialog('bookingDialog');
+      pendingExperience = selectedExperience;
+      setAuthMode('login');
+      message('authMessage', 'Sign in first, then your selected experience will be ready to book.');
+      return;
     }
 
-    if (remaining <= 0) {
-      expireCheckout();
+    const payload = {
+      experienceId: $('bookingExperienceId').value,
+      customerName: $('customerName').value.trim(),
+      customerPhone: $('customerPhone').value.trim(),
+      date: $('bookingDate').value,
+      time: $('bookingTime').value,
+      guests: Number($('guestCount').value),
+      transportMode: $('transportMode').value,
+      pickupLocation: $('pickupLocation').value.trim(),
+      paymentMethod: $('paymentMethod').value
+    };
+
+    if (!payload.paymentMethod) {
+      message('bookingMessage', 'Choose a payment preference to continue.', true);
+      return;
     }
-  }, 200);
-}
 
-function expireCheckout() {
-  if (checkoutExpired) return;
-
-  checkoutExpired = true;
-
-  clearInterval(checkoutInterval);
-  checkoutInterval = null;
-
-  updateStopwatch(0);
-
-  setCheckoutStatus(
-    'Checkout expired',
-    'Your checkout session has expired. Please try again.'
-  );
-
-  if ($('cancelCheckout')) {
-    $('cancelCheckout').textContent = 'Close';
+    $('bookingSubmit').disabled = true;
+    $('bookingSubmit').textContent = 'Creating your booking...';
+    message('bookingMessage', '');
+    try {
+      const result = await api('/bookings', {
+        method:'POST',
+        headers:authHeaders(),
+        body:JSON.stringify(payload)
+      });
+      startCheckout(result.booking || result);
+    } catch (error) {
+      message('bookingMessage', error.message, true);
+    } finally {
+      $('bookingSubmit').disabled = false;
+      $('bookingSubmit').innerHTML = 'Continue to checkout <span>→</span>';
+    }
   }
 
-  if ($('confirmCheckout')) {
-    $('confirmCheckout').disabled = true;
-  }
-
-  setMessage(
-    'checkoutMessage',
-    'Your checkout session has expired.',
-    true
-  );
-}
-
-// --------------------------------------------------
-// CANCEL CHECKOUT
-// --------------------------------------------------
-
-$('cancelCheckout')?.addEventListener('click', () => {
-  clearInterval(checkoutInterval);
-  checkoutInterval = null;
-
-  closeDialog('checkoutDialog');
-
-  if ($('cancelCheckout')) {
-    $('cancelCheckout').textContent = 'Cancel checkout';
-  }
-});
-
-$('checkoutDialog')?.addEventListener('close', () => {
-  clearInterval(checkoutInterval);
-  checkoutInterval = null;
-});
-
-// --------------------------------------------------
-// DEMO PAYMENT CONFIRMATION
-// --------------------------------------------------
-
-$('confirmCheckout')?.addEventListener('click', async () => {
-  if (!currentBooking?.id || checkoutExpired) return;
-
-  if (Date.now() >= checkoutExpiresAt) {
-    expireCheckout();
-    return;
-  }
-
-  try {
+  async function confirmPayment() {
+    if (!currentBooking?.id || checkoutExpired) return;
     $('confirmCheckout').disabled = true;
     $('confirmCheckout').textContent = 'Processing...';
-
-    setCheckoutStatus(
-      'Processing payment',
-      'Processing your demo payment...'
-    );
-
-    const data = await apiRequest(
-      `/bookings/${encodeURIComponent(currentBooking.id)}/pay`,
-      {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ confirm: true })
-      }
-    );
-
-    currentBooking = data.booking || currentBooking;
-
-    clearInterval(checkoutInterval);
-    checkoutInterval = null;
-    checkoutExpired = true;
-
-    setCheckoutStatus(
-      'Booking confirmed!',
-      'Your booking has been confirmed successfully.'
-    );
-
-    $('confirmCheckout').textContent = 'Confirmed ✓';
-
-    setTimeout(() => {
-      closeDialog('checkoutDialog');
-      openMyBookings();
-    }, 1500);
-
-  } catch (error) {
-    setMessage('checkoutMessage', error.message, true);
-
-    if (Date.now() >= checkoutExpiresAt) {
-      expireCheckout();
-    } else {
+    message('checkoutMessage', '');
+    try {
+      const result = await api(`/bookings/${encodeURIComponent(currentBooking.id)}/pay`, {
+        method:'POST',
+        headers:authHeaders(),
+        body:JSON.stringify({confirm:true})
+      });
+      currentBooking = result.booking || currentBooking;
+      clearInterval(checkoutTimer);
+      checkoutExpired = true;
+      $('checkoutHeading').textContent = 'A good thing is on its way.';
+      $('checkoutStatus').textContent = 'Your demo booking has been confirmed successfully.';
+      $('confirmCheckout').textContent = 'Confirmed ✓';
+      toast('Booking confirmed!');
+      setTimeout(() => {
+        closeDialog('checkoutDialog');
+        openMyBookings();
+      }, 1000);
+    } catch (error) {
+      message('checkoutMessage', error.message, true);
       $('confirmCheckout').disabled = false;
-      $('confirmCheckout').textContent = 'Try Again';
+      $('confirmCheckout').textContent = 'Try again →';
     }
   }
-});
 
-// --------------------------------------------------
-// MY BOOKINGS
-// --------------------------------------------------
-
-async function openMyBookings() {
-  if (!getToken()) {
-    window.openBookingsAfterLogin = true;
-    showAuth('login');
-    setMessage('authMessage', 'Please log in to view your bookings.');
-    return;
+  function statusClass(booking) {
+    const status = String(booking.status || '').toLowerCase();
+    if (booking.paymentStatus === 'paid' || status === 'confirmed') return 'confirmed';
+    if (booking.paymentStatus === 'expired' || status.includes('expired')) return 'expired';
+    return 'pending';
   }
 
-  openDialog('bookingsDialog');
+  async function openMyBookings() {
+    if (!token()) {
+      window.showBookingsAfterAuth = true;
+      setAuthMode('login');
+      message('authMessage', 'Sign in to see your booking history.');
+      return;
+    }
+    showDialog('bookingsDialog');
+    $('bookingsList').innerHTML = '<p class="modal-lead">Gathering your journeys...</p>';
+    message('bookingsMessage', '');
+    try {
+      const result = await api('/bookings/my', {headers:authHeaders()});
+      const bookings = Array.isArray(result) ? result : (result.bookings || []);
+      if (!bookings.length) {
+        $('bookingsList').innerHTML = '<div class="empty-bookings">No bookings yet. Your next story is waiting in <a href="#experiences" class="underlined-link">experiences</a>.</div>';
+        return;
+      }
+      $('bookingsList').innerHTML = bookings.map(booking => {
+        const status = statusClass(booking);
+        const total = booking.pricing?.total ?? booking.total ?? 0;
+        const date = booking.date ? new Date(`${booking.date}T00:00:00`).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '—';
+        return `<article class="booking-history-card">
+          <div class="booking-history-heading"><div><div class="booking-ref">BOOKING ${escapeHTML(booking.bookingReference || booking.id)}</div><h3>${escapeHTML(booking.experienceTitle || 'Travel experience')}</h3></div><span class="booking-status ${status}">${status === 'confirmed' ? 'Confirmed' : status === 'expired' ? 'Payment expired' : 'Awaiting payment'}</span></div>
+          <div class="booking-info"><span><strong>Date:</strong> ${escapeHTML(date)}</span><span><strong>Time:</strong> ${escapeHTML(booking.time || '—')}</span><span><strong>Guests:</strong> ${escapeHTML(booking.guests || '—')}</span><span><strong>Total:</strong> ${money(total)}</span></div>
+        </article>`;
+      }).join('');
+    } catch (error) {
+      $('bookingsList').innerHTML = '';
+      message('bookingsMessage', error.message, true);
+    }
+  }
 
-  $('bookingsList').innerHTML = '<p>Loading your bookings...</p>';
+  function wireEvents() {
+    $('year').textContent = new Date().getFullYear();
+    if (token()) $('loginBtn').textContent = 'My account ↗';
 
-  setMessage('bookingsMessage', '');
+    $('loginBtn').addEventListener('click', () => setAuthMode('login'));
+    $('authForm').addEventListener('submit', submitAuth);
+    $('authSwitch').addEventListener('click', () => setAuthMode(authMode === 'login' ? 'register' : 'login'));
+    $('bookingForm').addEventListener('submit', submitBooking);
+    $('guestCount').addEventListener('input', updateTotal);
+    $('confirmCheckout').addEventListener('click', confirmPayment);
+    $('myBookingsBtn').addEventListener('click', openMyBookings);
 
-  try {
-    const data = await apiRequest('/bookings/my', {
-      headers: authHeaders()
+    $('filterRow').addEventListener('click', event => {
+      const chip = event.target.closest('[data-filter]');
+      if (!chip) return;
+      activeFilter = chip.dataset.filter;
+      document.querySelectorAll('.filter-chip').forEach(button => button.classList.toggle('active', button === chip));
+      renderExperiences();
     });
 
-    const bookings = Array.isArray(data)
-      ? data
-      : data.bookings || [];
+    $('searchForm').addEventListener('submit', event => {
+      event.preventDefault();
+      renderExperiences();
+      $('experiences').scrollIntoView({behavior:'smooth'});
+    });
+    $('destinationInput').addEventListener('input', renderExperiences);
+    $('categoryInput').addEventListener('change', renderExperiences);
 
-    renderMyBookings(bookings);
+    $('experienceGrid').addEventListener('click', event => {
+      const button = event.target.closest('[data-book]');
+      if (!button) return;
+      const item = experiences.find(experience => String(experience.id) === button.dataset.book);
+      if (!item) return;
+      if (!token()) {
+        pendingExperience = item;
+        setAuthMode('login');
+        message('authMessage', 'Sign in first. We will keep this experience ready for you.');
+        return;
+      }
+      openBooking(item);
+    });
 
-  } catch (error) {
-    $('bookingsList').innerHTML = '';
-    setMessage('bookingsMessage', error.message, true);
-  }
-}
+    $('menuToggle').addEventListener('click', () => $('mainNav').classList.toggle('active'));
+    $('mainNav').addEventListener('click', event => {
+      if (event.target.closest('a')) $('mainNav').classList.remove('active');
+    });
 
-function getDisplayStatus(booking) {
-  const paymentStatus =
-    String(booking.paymentStatus || '').toLowerCase();
+    document.querySelectorAll('[data-close]').forEach(button => {
+      button.addEventListener('click', () => closeDialog(button.dataset.close));
+    });
 
-  const status =
-    String(booking.status || '').toLowerCase();
+    ['authDialog','bookingDialog','checkoutDialog','bookingsDialog'].forEach(id => {
+      $(id).addEventListener('click', event => {
+        if (event.target === $(id)) closeDialog(id);
+      });
+    });
 
-  if (paymentStatus === 'paid' || status === 'confirmed') {
-    return 'Confirmed';
-  }
-
-  if (
-    paymentStatus === 'expired' ||
-    status === 'payment_expired'
-  ) {
-    return 'Payment expired';
-  }
-
-  if (status === 'pending_payment') {
-    return 'Awaiting payment';
-  }
-
-  return status
-    ? status.replaceAll('_', ' ')
-    : 'Pending';
-}
-
-function renderMyBookings(bookings) {
-  const container = $('bookingsList');
-
-  if (!container) return;
-
-  if (!bookings.length) {
-    container.innerHTML = `
-      <div class="empty-bookings">
-        <h3>No bookings yet</h3>
-        <p>Your next adventure is waiting to be discovered.</p>
-      </div>
-    `;
-    return;
+    $('cancelCheckout').addEventListener('click', () => {
+      clearInterval(checkoutTimer);
+      closeDialog('checkoutDialog');
+    });
+    $('checkoutDialog').addEventListener('close', () => clearInterval(checkoutTimer));
   }
 
-  container.innerHTML = bookings.map(booking => {
-    const status = getDisplayStatus(booking);
-
-    const total =
-      booking.pricing?.total ??
-      booking.total ??
-      booking.amount ??
-      0;
-
-    const reference = escapeHTML(
-      booking.bookingReference || booking.id || '—'
-    );
-
-    const title = escapeHTML(
-      booking.experienceTitle || 'Travel experience'
-    );
-
-    const date = escapeHTML(formatDate(booking.date));
-    const time = escapeHTML(booking.time || 'Not specified');
-    const guests = escapeHTML(booking.guests ?? '—');
-    const method = escapeHTML(booking.paymentMethod || '—');
-
-    const statusClass = status.toLowerCase().includes('confirmed')
-      ? 'booking-status-confirmed'
-      : status.toLowerCase().includes('expired')
-        ? 'booking-status-expired'
-        : 'booking-status-pending';
-
-    return `
-      <article class="booking-history-card">
-
-        <div class="booking-history-heading">
-          <div>
-            <p class="eyebrow dark">BOOKING ${reference}</p>
-            <h3>${title}</h3>
-          </div>
-
-          <span class="${statusClass}">
-            ${escapeHTML(status)}
-          </span>
-        </div>
-
-        <div class="booking-history-info">
-          <p><strong>Date:</strong> ${date}</p>
-          <p><strong>Time:</strong> ${time}</p>
-          <p><strong>Guests:</strong> ${guests}</p>
-          <p><strong>Total:</strong> ${formatCurrency(total)}</p>
-        </div>
-
-        <details class="booking-receipt">
-          <summary>View booking details / receipt</summary>
-
-          <p><strong>Booking reference:</strong> ${reference}</p>
-          <p><strong>Experience:</strong> ${title}</p>
-          <p><strong>Date:</strong> ${date}</p>
-          <p><strong>Time:</strong> ${time}</p>
-          <p><strong>Guests:</strong> ${guests}</p>
-          <p><strong>Payment method:</strong> ${method}</p>
-
-          <p>
-            <strong>Payment status:</strong>
-            ${escapeHTML(booking.paymentStatus || 'Not recorded')}
-          </p>
-
-          <p>
-            <strong>Booking status:</strong>
-            ${escapeHTML(booking.status || 'Pending')}
-          </p>
-
-          <p><strong>Total amount:</strong> ${formatCurrency(total)}</p>
-
-          ${booking.paymentReference
-            ? `<p><strong>Payment reference:</strong> ${escapeHTML(booking.paymentReference)}</p>`
-            : ''}
-
-          ${booking.paidAt
-            ? `<p><strong>Paid at:</strong> ${escapeHTML(new Date(booking.paidAt).toLocaleString('en-IN'))}</p>`
-            : ''}
-
-        </details>
-      </article>
-    `;
-  }).join('');
-}
-
-$('myBookingsBtn')?.addEventListener('click', openMyBookings);
-
-// --------------------------------------------------
-// NAVIGATION
-// --------------------------------------------------
-
-$('menuToggle')?.addEventListener('click', () => {
-  $('mainNav')?.classList.toggle('active');
-});
-
-$('mainNav')?.addEventListener('click', event => {
-  if (event.target.closest('a')) {
-    $('mainNav')?.classList.remove('active');
-  }
-});
-
-$('listBtn')?.addEventListener('click', () => {
-  alert('Partner registration will be added in a future step.');
-});
-
-$('ctaListBtn')?.addEventListener('click', () => {
-  alert('Partner registration will be added in a future step.');
-});
-
-// --------------------------------------------------
-// INITIALIZATION
-// --------------------------------------------------
-
-if ($('year')) {
-  $('year').textContent = new Date().getFullYear();
-}
-
-if (getToken() && $('loginBtn')) {
-  $('loginBtn').textContent = 'My Account';
-}
-
-loadExperiences();
+  document.addEventListener('DOMContentLoaded', () => {
+    wireEvents();
+    loadExperiences();
+  });
+})();
