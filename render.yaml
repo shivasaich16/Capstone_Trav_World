@@ -2,19 +2,13 @@ services:
   - type: web
     name: trav-world
     runtime: node
-    plan: starter
+    plan: free
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
-    disk:
-      name: trav-world-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: DATA_DIR
-        value: /var/data
