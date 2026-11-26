@@ -1,0 +1,140 @@
+/* PAYMENT METHOD OPTIONS */
+
+.payment-options {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.payment-options label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.payment-options input {
+  accent-color: #c49a52;
+}
+
+.booking-total {
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 0;
+  font-size: 18px;
+}
+
+/* CHECKOUT SCREEN */
+
+.checkout-dialog {
+  width: min(440px, 92%);
+  border: none;
+  border-radius: 22px;
+  padding: 35px 25px;
+  background: #151515;
+  color: white;
+  text-align: center;
+}
+
+.checkout-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.checkout-content h2 {
+  margin: 15px 0 25px;
+}
+
+.stopwatch {
+  width: 220px;
+  height: 220px;
+  position: relative;
+  margin: 25px auto;
+}
+
+.stopwatch svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.timer-track,
+.timer-progress {
+  fill: none;
+  stroke-width: 8;
+}
+
+.timer-track {
+  stroke: #383838;
+}
+
+.timer-progress {
+  stroke: #d4ad62;
+  stroke-linecap: round;
+  stroke-dasharray: 597;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.timer-display {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+#timerText {
+  font-size: 42px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-display small {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #aaa;
+  margin-top: 8px;
+}
+
+/* LOADING ANIMATION */
+
+.loading-spinner {
+  width: 42px;
+  height: 42px;
+  border: 4px solid #444;
+  border-top-color: #d4ad62;
+  border-radius: 50%;
+  margin: 25px auto;
+  animation: checkoutSpin 0.8s linear infinite;
+}
+
+@keyframes checkoutSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+#checkoutStatus {
+  color: #ddd;
+  animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes statusPulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.checkout-amount {
+  margin: 25px 0;
+  font-size: 18px;
+}
+
+.checkout-amount strong {
+  color: #d4ad62;
+}

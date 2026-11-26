@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f7f6f2">
+  <meta name="description" content="Discover exceptional stays, local experiences and unforgettable journeys across India with Trav-World.">
+  <title>Trav-World — Find your somewhere</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./src/styles/main.css">
+  <script>
+    // Local API address. Keep this as-is for your local backend.
+    // When you deploy the backend, replace this with its public HTTPS API URL.
+    window.SERVICE_BOOKER_API = "http://localhost:4000/api";
+  </script>
+  <script src="./src/js/app.js" defer></script>
+</head>
+<body>
+  <div class="announcement"><span class="announcement-dot"></span> MADE FOR THE WAY YOU WANT TO TRAVEL <span class="announcement-sep">·</span> DISCOVER INDIA DIFFERENTLY</div>
+  <header class="site-header">
+    <a class="brand" href="#home" aria-label="Trav-World home">
+      <span class="brand-symbol">t<span>w</span></span>
+      <span class="brand-name">trav<span>world</span><small>THE ART OF GETTING AWAY</small></span>
+    </a>
+    <button class="mobile-menu" id="menuToggle" aria-label="Open menu">☰</button>
+    <nav class="main-nav" id="mainNav">
+      <a href="#home" class="nav-active">Home</a>
+      <a href="#destinations">Discover</a>
+      <a href="#experiences">Experiences</a>
+      <a href="#how">Our story</a>
+    </nav>
+    <div class="header-actions">
+      <button class="nav-bookings" id="myBookingsBtn">My bookings</button>
+      <button class="btn btn-dark btn-small" id="loginBtn">Sign in <span>↗</span></button>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <img class="hero-image" src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=2200&q=88" alt="Golden sunlight over a beautiful mountain valley" fetchpriority="high">
+      <div class="hero-overlay"></div>
+      <div class="hero-content">
+        <div class="hero-kicker"><span></span> YOUR NEXT CHAPTER STARTS HERE</div>
+        <h1>Find your<br><em>somewhere.</em></h1>
+        <p class="hero-description">Extraordinary places. Local stories. Little moments that stay with you long after the journey ends.</p>
+        <a href="#experiences" class="hero-link">Explore experiences <span>↘</span></a>
+      </div>
+      <div class="hero-caption"><span>01 / 04</span><span>THE WORLD IS CLOSER THAN YOU THINK</span></div>
+      <div class="hero-location"><span class="location-pin">✳</span> CURATED EXPERIENCES ACROSS INDIA</div>
+    </section>
+
+    <section class="search-wrap" aria-label="Search experiences">
+      <form class="search-panel" id="searchForm">
+        <label class="search-field">
+          <span class="search-icon">⌕</span>
+          <span class="search-label">WHERE TO?</span>
+          <input id="destinationInput" type="search" placeholder="Try Goa, Coorg, Manali..." autocomplete="off">
+        </label>
+        <span class="search-divider"></span>
+        <label class="search-field category-field">
+          <span class="search-icon">✳</span>
+          <span class="search-label">YOUR KIND OF TRIP</span>
+          <select id="categoryInput">
+            <option value="">All experiences</option>
+            <option value="Adventure">Adventure</option>
+            <option value="Stay">Stays</option>
+            <option value="Food">Food & drink</option>
+            <option value="Local tours">Local tours</option>
+            <option value="Transport">Transport</option>
+          </select>
+        </label>
+        <button class="btn btn-accent search-button" type="submit">Find experiences <span>→</span></button>
+      </form>
+    </section>
+
+    <section class="intro-section section-shell" id="destinations">
+      <div class="section-eyebrow">A DIFFERENT WAY TO GET AWAY <span>✳</span></div>
+      <div class="intro-grid">
+        <h2>Not just places.<br><em>Places that move you.</em></h2>
+        <div class="intro-copy">
+          <p>We believe the best journeys aren't measured in miles. They're found in hidden cafés, quiet mornings, winding roads and the people who make a place feel like yours.</p>
+          <a href="#experiences" class="underlined-link">Find your next experience <span>↗</span></a>
+        </div>
+      </div>
+      <div class="stats-row">
+        <div><strong>01</strong><span>Find a place<br>that feels different</span></div>
+        <div><strong>02</strong><span>Meet the people<br>who know it best</span></div>
+        <div><strong>03</strong><span>Make memories<br>worth keeping</span></div>
+      </div>
+    </section>
+
+    <section class="experiences-section" id="experiences">
+      <div class="section-shell">
+        <div class="experiences-heading">
+          <div>
+            <div class="section-eyebrow">THE GOOD STUFF <span>✳</span></div>
+            <h2>Go on. <em>Get out there.</em></h2>
+            <p class="section-subtitle">A few handpicked ways to make your next trip unforgettable.</p>
+          </div>
+          <div class="heading-side-note">COLLECT MOMENTS,<br>NOT MILEAGE.</div>
+        </div>
+        <div class="filter-row" id="filterRow">
+          <button class="filter-chip active" type="button" data-filter="All">All experiences</button>
+          <button class="filter-chip" type="button" data-filter="Adventure">Adventure</button>
+          <button class="filter-chip" type="button" data-filter="Stay">Slow stays</button>
+          <button class="filter-chip" type="button" data-filter="Food">Food trails</button>
+          <button class="filter-chip" type="button" data-filter="Local tours">Local discoveries</button>
+          <button class="filter-chip" type="button" data-filter="Transport">Getting there</button>
+        </div>
+        <div class="experience-grid" id="experienceGrid" aria-live="polite">
+          <div class="loading-card"><span class="loader"></span><p>Finding your somewhere...</p></div>
+        </div>
+        <p class="api-note" id="apiNote" role="status"></p>
+      </div>
+    </section>
+
+    <section class="manifesto">
+      <img src="https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=2000&q=85" alt="Still lake surrounded by dramatic mountains" loading="lazy">
+      <div class="manifesto-shade"></div>
+      <div class="manifesto-content">
+        <div class="section-eyebrow light">TAKE THE SCENIC ROUTE</div>
+        <h2>Somewhere between<br>here and <em>happiness.</em></h2>
+        <p>Leave room for the unexpected. That's where the best stories begin.</p>
+        <a href="#experiences" class="btn btn-light">Find your escape <span>↗</span></a>
+      </div>
+      <div class="manifesto-index">TRAV-WORLD / FIELD NOTES Nº 001</div>
+    </section>
+
+    <section class="how-section section-shell" id="how">
+      <div class="how-heading">
+        <div class="section-eyebrow">EASY DOES IT <span>✳</span></div>
+        <h2>Three steps.<br><em>One great story.</em></h2>
+      </div>
+      <div class="steps-grid">
+        <article class="step-card"><span class="step-number">01</span><div class="step-icon">⌕</div><h3>Find your feeling</h3><p>Browse places and experiences that match the kind of daydream you're having.</p></article>
+        <article class="step-card"><span class="step-number">02</span><div class="step-icon">↗</div><h3>Make it yours</h3><p>Choose your date, gather your people and send a booking request in minutes.</p></article>
+        <article class="step-card"><span class="step-number">03</span><div class="step-icon">✳</div><h3>Go make memories</h3><p>Keep your booking details close and get ready for something wonderful.</p></article>
+      </div>
+    </section>
+
+    <section class="partner-banner">
+      <div><div class="section-eyebrow light">GOOD EXPERIENCES ARE BETTER SHARED</div><h2>Have a place<br>worth <em>sharing?</em></h2></div>
+      <p>We're always looking for local hosts and thoughtful experiences to add to the journey.</p>
+      <a class="btn btn-light" href="mailto:hello@travworld.example">Become a partner <span>↗</span></a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="brand footer-brand" href="#home"><span class="brand-symbol">t<span>w</span></span><span class="brand-name">trav<span>world</span><small>THE ART OF GETTING AWAY</small></span></a>
+    <p>Go somewhere. Feel everything.</p>
+    <span>© <span id="year"></span> TRAV-WORLD</span>
+  </footer>
+
+  <!-- Sign in / registration -->
+  <dialog class="modal" id="authDialog">
+    <form class="modal-card" id="authForm">
+      <button type="button" class="modal-close" data-close="authDialog" aria-label="Close">×</button>
+      <div class="modal-kicker">WELCOME TO TRAV-WORLD</div>
+      <h2 id="dialogTitle">Good to have you back.</h2>
+      <p class="modal-lead">Sign in to keep your next journey close.</p>
+      <label class="form-label">Email address<input type="email" id="email" placeholder="you@example.com" required></label>
+      <label class="form-label">Password<input type="password" id="password" minlength="6" placeholder="At least 6 characters" required></label>
+      <button class="btn btn-dark modal-submit" id="authSubmit" type="submit">Sign in <span>→</span></button>
+      <p class="modal-switch" id="authSwitch">New to Trav-World? <button type="button">Create an account</button></p>
+      <p class="form-message" id="authMessage" role="status"></p>
+    </form>
+  </dialog>
+
+  <!-- Booking -->
+  <dialog class="modal" id="bookingDialog">
+    <form class="modal-card modal-wide" id="bookingForm">
+      <button type="button" class="modal-close" data-close="bookingDialog" aria-label="Close">×</button>
+      <div class="modal-kicker">MAKE IT YOURS</div>
+      <h2 id="bookingTitle">Plan your experience.</h2>
+      <p class="modal-lead">A few details and you're one step closer.</p>
+      <input type="hidden" id="bookingExperienceId">
+      <div class="form-grid">
+        <label class="form-label">Your name<input id="customerName" type="text" placeholder="Full name" required></label>
+        <label class="form-label">Email address<input id="customerEmail" type="email" placeholder="you@example.com" required></label>
+        <label class="form-label">Phone number<input id="customerPhone" type="tel" placeholder="+91 98765 43210" required></label>
+        <label class="form-label">Preferred date<input id="bookingDate" type="date" required></label>
+        <label class="form-label">Preferred time<input id="bookingTime" type="time" required></label>
+        <label class="form-label">Number of guests<input id="guestCount" type="number" min="1" max="30" value="1" required></label>
+        <label class="form-label">Getting there<select id="transportMode" required><option value="">Choose transport</option><option value="CAR">Car</option><option value="BUS">Bus</option><option value="TRAIN">Train</option><option value="SELF">Own transport</option></select></label>
+        <label class="form-label">Pickup location<input id="pickupLocation" type="text" placeholder="City or pickup point" required></label>
+        <label class="form-label form-full">Payment preference<select id="paymentMethod" required><option value="">Choose a demo payment method</option><option value="UPI">UPI (demo)</option><option value="CARD">Card (demo)</option><option value="NET_BANKING">Net banking (demo)</option></select></label>
+      </div>
+      <div class="booking-total"><span>Estimated total</span><strong id="bookingTotal">₹0</strong></div>
+      <p class="demo-note">Demo checkout only. No real payment is collected.</p>
+      <button class="btn btn-dark modal-submit" type="submit" id="bookingSubmit">Continue to checkout <span>→</span></button>
+      <p class="form-message" id="bookingMessage" role="status"></p>
+    </form>
+  </dialog>
+
+  <!-- Demo checkout -->
+  <dialog class="modal" id="checkoutDialog">
+    <div class="modal-card checkout-card">
+      <button type="button" class="modal-close" data-close="checkoutDialog" aria-label="Close">×</button>
+      <div class="modal-kicker">A LITTLE PAUSE BEFORE THE GOOD PART</div>
+      <h2 id="checkoutHeading">Your journey is almost set.</h2>
+      <p class="modal-lead" id="checkoutStatus">Complete your demo payment within 60 seconds.</p>
+      <div class="countdown"><strong id="timerText">01:00</strong><span>TIME REMAINING</span></div>
+      <div class="checkout-summary"><span>Booking reference</span><strong id="checkoutReference">—</strong><span>Experience</span><strong id="checkoutExperience">—</strong><span>Payment method</span><strong id="checkoutMethod">—</strong><span>Total</span><strong id="checkoutAmount">₹0</strong></div>
+      <p class="demo-note">This is a simulated payment flow. No card or UPI credentials are requested.</p>
+      <button class="btn btn-dark modal-submit" id="confirmCheckout" type="button">Confirm demo payment <span>→</span></button>
+      <button class="text-button" id="cancelCheckout" type="button">Cancel checkout</button>
+      <p class="form-message" id="checkoutMessage" role="status"></p>
+    </div>
+  </dialog>
+
+  <!-- Booking history -->
+  <dialog class="modal" id="bookingsDialog">
+    <div class="modal-card bookings-modal">
+      <button type="button" class="modal-close" data-close="bookingsDialog" aria-label="Close">×</button>
+      <div class="modal-kicker">YOUR TRAVEL JOURNAL</div>
+      <h2>My bookings.</h2>
+      <p class="modal-lead">All your little getaways, in one place.</p>
+      <div id="bookingsList"><p>Loading your bookings...</p></div>
+      <p class="form-message" id="bookingsMessage" role="status"></p>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
